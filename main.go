@@ -7,25 +7,41 @@ import (
 )
 
 func main() {
-	cfg, err := config.ReadConfig()
+	readCfg, err := config.ReadConfig()
 	if err != nil {
 		fmt.Println("Error reading config:", err)
 		os.Exit(1)
 	}
 
-	fmt.Printf("Initial config: %+v\n", cfg)
+	fmt.Printf("Initial config: %+v\n", readCfg)
 
-	err = config.SetConfig("Kev")
-	if err != nil {
-		fmt.Println("Error setting config:", err)
+	s := config.State{
+		Cfg : readCfg,
+	}
+
+	cmds := config.Commands{
+		CmdNames: make(map[string]func(*config.State, config.Command) error),
+	}
+
+	cmds.Register("login", config.HandlerLogin)
+
+	if len(os.Args) < 2 {
+		fmt.Println("Require more argument")
+		os.Exit(1)
+	}
+	
+	cmd := config.Command{
+		Name : os.Args[1],
+		Args : os.Args[2:],
+	}
+
+	fErr := cmds.Run(&s, cmd)
+
+	if fErr != nil {
+		fmt.Println(fErr)
 		os.Exit(1)
 	}
 
-	cfg, err = config.ReadConfig()
-	if err != nil {
-		fmt.Println("Error reading config after set:", err)
-		os.Exit(1)
-	}
+	fmt.Printf("Updated config: %+v\n", readCfg)
 
-	fmt.Printf("Updated config: %+v\n", cfg)
 }

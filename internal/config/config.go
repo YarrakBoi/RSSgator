@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"fmt"
 )
 
 const configFileName = ".gatorconfig.json"
@@ -14,7 +15,50 @@ type Config struct {
 }
 
 type State struct {
-	ptr *Config
+	Cfg *Config
+}
+
+type Command struct {
+	Name string
+	Args []string
+}
+
+type Commands struct {
+	CmdNames map[string]func(*State, Command) error
+}
+
+func (c *Commands) Run(s *State, cmd Command) error {
+	f, ok := c.CmdNames[cmd.Name]
+	if !ok {
+		return fmt.Errorf("command does not exist, please register if needed")
+	}
+	
+	fErr := f(s, cmd)
+
+	if fErr != nil {
+		return fErr
+	}
+
+	return nil
+
+
+}
+
+func (c *Commands) Register(name string, f func(*State, Command) error) {
+	c.CmdNames[name] = f
+}
+
+func HandlerLogin(s *State, cmd Command) error {
+	if len(cmd.Args) == 0 {
+		return fmt.Errorf("username not supplied")
+	}
+	s.Cfg.Current_user_name = cmd.Args[0]
+	err := SaveConfig(s.Cfg)
+	if err != nil {
+		return err
+	}
+	fmt.Println("User has been set")
+	return nil
 }
 
 func ReadConfig() (*Config, error) {
@@ -42,7 +86,7 @@ func ReadConfig() (*Config, error) {
 	return config, nil
 }
 
-func SetConfig(current_name string) error {
+func SaveConfig(cfg *Config) error {
 	home, err := os.UserHomeDir()
 
 	if err != nil {
@@ -51,14 +95,7 @@ func SetConfig(current_name string) error {
 
 	configFilePath := filepath.Join(home, configFileName)
 
-	currConfig, err := ReadConfig() 
-
-	if err != nil {
-		return err 
-	}
-	currConfig.Current_user_name = current_name
-
-	configJson, err := json.Marshal(currConfig)
+	configJson, err := json.Marshal(cfg)
 
 	if err != nil {
 		return err 
